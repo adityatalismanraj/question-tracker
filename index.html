@@ -195,6 +195,68 @@
   let useRealTorch = false;
   let motionReady  = false;
 
+  /* ---- Wake Lock: keep screen on while torch is active ---- */
+  let wakeLock = null;
+
+  async function acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+    } catch(e) { /* denied or unavailable */ }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+  }
+
+  /* Re-acquire wake lock when tab becomes visible again (OS can release it on tab switch) */
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && torchOn) {
+      await acquireWakeLock();
+      /* Also re-apply torch — camera track may have been paused by browser */
+      if (useRealTorch && torchTrack) {
+        try { await torchTrack.applyConstraints({ advanced: [{ torch: true }] }); }
+        catch(e) { /* track died, rebuild */ await rebuildTorch(); }
+      }
+    }
+  });
+
+  /* ---- Silent audio keepalive (helps prevent JS suspension on some browsers) ---- */
+  let audioCtx = null;
+
+  function startSilentAudio() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf  = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+      const src  = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.loop   = true;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch(e) {}
+  }
+
+  function stopSilentAudio() {
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  }
+
+  /* ---- Rebuild torch track if it got dropped ---- */
+  async function rebuildTorch() {
+    try {
+      if (torchStream) torchStream.getTracks().forEach(t => t.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const track  = stream.getVideoTracks()[0];
+      const caps   = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.torch) {
+        torchStream  = stream;
+        torchTrack   = track;
+        useRealTorch = true;
+        await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
+      }
+    } catch(e) {}
+  }
+
   /* ---- Shake detection ---- */
   let lastAcc = null;
   let shakeLastTime = 0;
@@ -280,6 +342,14 @@
     }
     app.classList.toggle('torch-on', on);
     statusText.textContent = on ? 'On' : 'Off';
+
+    if (on) {
+      await acquireWakeLock();
+      startSilentAudio();
+    } else {
+      releaseWakeLock();
+      stopSilentAudio();
+    }
   }
 
   async function toggleTorch() {
