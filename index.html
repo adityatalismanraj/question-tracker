@@ -1,556 +1,303 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Study Tracker</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Shake Torch</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-    :root {
-      --bg:        #0a0a0f;
-      --surface:   #111118;
-      --border:    #1e1e2e;
-      --muted:     #2a2a3c;
-      --text:      #e8e8f0;
-      --sub:       #5a5a7a;
-      --phy:       #00d4ff;
-      --chem:      #ff6b35;
-      --math:      #a8ff3e;
-      --phy-glow:  rgba(0,212,255,.18);
-      --chem-glow: rgba(255,107,53,.18);
-      --math-glow: rgba(168,255,62,.18);
-    }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #000;
+    color: #fff;
+    user-select: none;
+  }
 
-    html, body {
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Syne', sans-serif;
-      overflow-x: hidden;
-    }
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+  }
 
-    /* ── Noise grain overlay ── */
-    body::before {
-      content: '';
-      position: fixed; inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
-      background-size: 180px;
-      pointer-events: none;
-      z-index: 0;
-      opacity: .6;
-    }
+  #app.torch-on {
+    background: #fff;
+    color: #000;
+  }
 
-    /* ── Grid lines ── */
-    body::after {
-      content: '';
-      position: fixed; inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 60px 60px;
-      pointer-events: none;
-      z-index: 0;
-      opacity: .35;
-    }
+  /* Full-screen white flash overlay for visual fallback */
+  #flash-overlay {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+    z-index: 0;
+  }
 
-    .wrapper {
-      position: relative; z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 60px 24px 80px;
-    }
+  .content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    padding: 2rem;
+    text-align: center;
+  }
 
-    /* ── Header ── */
-    header {
-      text-align: center;
-      margin-bottom: 72px;
-      animation: fadeUp .7s ease both;
-    }
+  .icon-ring {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
 
-    .eyebrow {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      letter-spacing: .25em;
-      text-transform: uppercase;
-      color: var(--sub);
-      margin-bottom: 14px;
-    }
+  #app.torch-on .icon-ring {
+    border-color: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.04);
+  }
 
-    h1 {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(52px, 9vw, 96px);
-      line-height: .95;
-      letter-spacing: .04em;
-      background: linear-gradient(135deg, #fff 30%, var(--sub));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
+  .icon-ring svg {
+    width: 72px;
+    height: 72px;
+    transition: fill 0.2s, opacity 0.2s;
+  }
 
-    .subtitle {
-      margin-top: 16px;
-      font-size: 14px;
-      color: var(--sub);
-      font-weight: 400;
-      letter-spacing: .04em;
-    }
+  .status-text {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.5;
+    transition: color 0.2s, opacity 0.2s;
+  }
 
-    /* ── Cards grid ── */
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
-      gap: 24px;
-      width: 100%;
-      max-width: 980px;
-    }
+  #app.torch-on .status-text { color: #000; }
 
-    /* ── Card ── */
-    .card {
-      position: relative;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 40px 36px 36px;
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
-      overflow: hidden;
-      animation: fadeUp .7s ease both;
-      transition: transform .25s ease, box-shadow .25s ease;
-    }
-    .card:nth-child(2) { animation-delay: .12s; }
-    .card:nth-child(3) { animation-delay: .24s; }
+  .hint {
+    font-size: 13px;
+    opacity: 0.35;
+    line-height: 1.6;
+    max-width: 240px;
+    transition: color 0.2s;
+  }
 
-    .card:hover { transform: translateY(-4px); }
+  #app.torch-on .hint { color: #000; }
 
-    /* Accent corner glow */
-    .card::before {
-      content: '';
-      position: absolute;
-      top: -60px; right: -60px;
-      width: 180px; height: 180px;
-      border-radius: 50%;
-      filter: blur(60px);
-      opacity: .45;
-      transition: opacity .3s;
-    }
-    .card:hover::before { opacity: .7; }
+  /* iOS permission button */
+  #permission-btn {
+    display: none;
+    padding: 14px 32px;
+    border-radius: 50px;
+    border: 1.5px solid rgba(255,255,255,0.4);
+    background: transparent;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 0.15s;
+  }
 
-    .card.phy { box-shadow: 0 0 0 1px var(--border), 0 24px 60px rgba(0,0,0,.5); }
-    .card.phy::before { background: var(--phy); }
-    .card.phy:hover { box-shadow: 0 0 0 1px var(--phy), 0 24px 60px rgba(0,0,0,.5), 0 0 40px var(--phy-glow); }
+  #permission-btn:active { background: rgba(255,255,255,0.1); }
 
-    .card.chem::before { background: var(--chem); }
-    .card.chem:hover { box-shadow: 0 0 0 1px var(--chem), 0 24px 60px rgba(0,0,0,.5), 0 0 40px var(--chem-glow); }
+  /* Shake ripple animation */
+  @keyframes ripple {
+    0%   { transform: scale(1);   opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
 
-    .card.math::before { background: var(--math); }
-    .card.math:hover { box-shadow: 0 0 0 1px var(--math), 0 24px 60px rgba(0,0,0,.5), 0 0 40px var(--math-glow); }
+  .ripple {
+    position: absolute;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+    animation: ripple 0.5s ease-out forwards;
+    pointer-events: none;
+  }
 
-    /* ── Card top row ── */
-    .card-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-    }
+  #app.torch-on .ripple { border-color: rgba(0,0,0,0.2); }
 
-    .label {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px;
-      letter-spacing: .07em;
-    }
-    .card.phy  .label { color: var(--phy); }
-    .card.chem .label { color: var(--chem); }
-    .card.math .label { color: var(--math); }
+  /* Mode badge */
+  .mode-badge {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.25;
+    white-space: nowrap;
+    transition: color 0.2s;
+  }
 
-    .icon {
-      width: 40px; height: 40px;
-      border-radius: 10px;
-      display: grid; place-items: center;
-      font-size: 20px;
-      opacity: .9;
-    }
-    .card.phy  .icon { background: var(--phy-glow);  border: 1px solid rgba(0,212,255,.2); }
-    .card.chem .icon { background: var(--chem-glow); border: 1px solid rgba(255,107,53,.2); }
-    .card.math .icon { background: var(--math-glow); border: 1px solid rgba(168,255,62,.2); }
-
-    /* ── Counter number ── */
-    .counter-wrap {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-    }
-
-    .count {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 88px;
-      line-height: 1;
-      letter-spacing: -.02em;
-      transition: transform .12s cubic-bezier(.34,1.56,.64,1), color .12s;
-    }
-    .card.phy  .count { color: var(--phy); }
-    .card.chem .count { color: var(--chem); }
-    .card.math .count { color: var(--math); }
-
-    .count.pop {
-      transform: scale(1.18);
-    }
-
-    .unit {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      color: var(--sub);
-      letter-spacing: .1em;
-    }
-
-    /* ── Progress bar ── */
-    .bar-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .bar-meta {
-      display: flex;
-      justify-content: space-between;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--sub);
-      letter-spacing: .05em;
-    }
-
-    .bar-bg {
-      height: 4px;
-      background: var(--muted);
-      border-radius: 99px;
-      overflow: hidden;
-    }
-
-    .bar-fill {
-      height: 100%;
-      border-radius: 99px;
-      width: 0%;
-      transition: width .4s cubic-bezier(.4,0,.2,1);
-    }
-    .card.phy  .bar-fill { background: linear-gradient(90deg, var(--phy), #006bff); }
-    .card.chem .bar-fill { background: linear-gradient(90deg, var(--chem), #ff0080); }
-    .card.math .bar-fill { background: linear-gradient(90deg, var(--math), #00ff9f); }
-
-    /* ── +1 Button ── */
-    .btn {
-      position: relative;
-      width: 100%;
-      padding: 18px 0;
-      border: none;
-      border-radius: 12px;
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 22px;
-      letter-spacing: .12em;
-      cursor: pointer;
-      overflow: hidden;
-      transition: transform .15s ease, box-shadow .15s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .btn::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,.08);
-      opacity: 0;
-      transition: opacity .2s;
-    }
-    .btn:hover::after { opacity: 1; }
-    .btn:active { transform: scale(.97); }
-
-    .card.phy  .btn { background: linear-gradient(135deg, rgba(0,212,255,.2), rgba(0,107,255,.2)); color: var(--phy);  border: 1px solid rgba(0,212,255,.35); box-shadow: 0 0 30px rgba(0,212,255,.1); }
-    .card.chem .btn { background: linear-gradient(135deg, rgba(255,107,53,.2), rgba(255,0,128,.2)); color: var(--chem); border: 1px solid rgba(255,107,53,.35); box-shadow: 0 0 30px rgba(255,107,53,.1); }
-    .card.math .btn { background: linear-gradient(135deg, rgba(168,255,62,.2), rgba(0,255,159,.2)); color: var(--math); border: 1px solid rgba(168,255,62,.35); box-shadow: 0 0 30px rgba(168,255,62,.1); }
-
-    .card.phy  .btn:hover { box-shadow: 0 0 40px rgba(0,212,255,.3); }
-    .card.chem .btn:hover { box-shadow: 0 0 40px rgba(255,107,53,.3); }
-    .card.math .btn:hover { box-shadow: 0 0 40px rgba(168,255,62,.3); }
-
-    /* Ripple */
-    .ripple {
-      position: absolute;
-      border-radius: 50%;
-      transform: scale(0);
-      animation: ripple .55s linear;
-      pointer-events: none;
-      opacity: .35;
-    }
-    .card.phy  .ripple { background: var(--phy); }
-    .card.chem .ripple { background: var(--chem); }
-    .card.math .ripple { background: var(--math); }
-
-    /* ── Total strip ── */
-    .total-strip {
-      margin-top: 52px;
-      width: 100%;
-      max-width: 980px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      flex-wrap: wrap;
-      animation: fadeUp .7s .36s ease both;
-    }
-
-    .total-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      letter-spacing: .2em;
-      text-transform: uppercase;
-      color: var(--sub);
-    }
-
-    .total-num {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 42px;
-      letter-spacing: .04em;
-      background: linear-gradient(90deg, var(--phy), var(--chem), var(--math));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .streak {
-      font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      color: var(--sub);
-    }
-    .streak span {
-      color: var(--math);
-      font-weight: 500;
-    }
-
-    /* ── Reset ── */
-    .reset-btn {
-      background: none;
-      border: 1px solid var(--muted);
-      color: var(--sub);
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      letter-spacing: .15em;
-      text-transform: uppercase;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: border-color .2s, color .2s;
-    }
-    .reset-btn:hover { border-color: var(--text); color: var(--text); }
-
-    /* ── Footer ── */
-    footer {
-      margin-top: 60px;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--sub);
-      letter-spacing: .1em;
-      animation: fadeUp .7s .5s ease both;
-    }
-
-    /* ── Floating +1 ── */
-    .float-label {
-      position: fixed;
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 28px;
-      pointer-events: none;
-      z-index: 999;
-      opacity: 0;
-      transform: translateY(0);
-      transition: none;
-    }
-    .float-label.active {
-      animation: floatUp .7s ease forwards;
-    }
-
-    /* ── Animations ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes ripple {
-      to { transform: scale(4); opacity: 0; }
-    }
-
-    @keyframes floatUp {
-      0%   { opacity: 1; transform: translateY(0)     scale(1); }
-      100% { opacity: 0; transform: translateY(-70px) scale(1.3); }
-    }
-
-    @media (max-width: 480px) {
-      .count { font-size: 72px; }
-      .total-strip { flex-direction: column; align-items: flex-start; gap: 12px; }
-    }
-  </style>
+  #app.torch-on .mode-badge { color: #000; }
+</style>
 </head>
 <body>
-<div class="wrapper">
+<div id="app">
+  <div id="flash-overlay"></div>
 
-  <header>
-    <p class="eyebrow">/ daily study tracker /</p>
-    <h1>Questions<br>Solved</h1>
-    <p class="subtitle">Track every question. Own the grind.</p>
-  </header>
-
-  <div class="cards">
-
-    <!-- Physics -->
-    <div class="card phy">
-      <div class="card-head">
-        <span class="label">Physics</span>
-        <div class="icon">⚡</div>
-      </div>
-      <div class="counter-wrap">
-        <div class="count" id="phy-count">0</div>
-        <span class="unit">QS</span>
-      </div>
-      <div class="bar-wrap">
-        <div class="bar-meta">
-          <span>Progress</span>
-          <span id="phy-pct">0%</span>
-        </div>
-        <div class="bar-bg"><div class="bar-fill" id="phy-bar"></div></div>
-      </div>
-      <button class="btn" id="phy-btn" onclick="increment('phy', event)">+ ADD QUESTION</button>
+  <div class="content">
+    <div class="icon-ring" id="toggle-btn" role="button" aria-label="Toggle torch" tabindex="0">
+      <svg viewBox="0 0 24 24" id="torch-icon" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <!-- Flashlight / torch icon -->
+        <path d="M9 2h6l1 6H8L9 2z" opacity="0.9"/>
+        <path d="M8 8h8l-1 3H9L8 8z" opacity="0.7"/>
+        <path d="M9 11h6l3 9H6l3-9z" opacity="0.85"/>
+        <rect x="10.5" y="15" width="3" height="4" rx="0.5" fill="rgba(0,0,0,0.35)"/>
+      </svg>
     </div>
 
-    <!-- Chemistry -->
-    <div class="card chem">
-      <div class="card-head">
-        <span class="label">Chemistry</span>
-        <div class="icon">🧪</div>
-      </div>
-      <div class="counter-wrap">
-        <div class="count" id="chem-count">0</div>
-        <span class="unit">QS</span>
-      </div>
-      <div class="bar-wrap">
-        <div class="bar-meta">
-          <span>Progress</span>
-          <span id="chem-pct">0%</span>
-        </div>
-        <div class="bar-bg"><div class="bar-fill" id="chem-bar"></div></div>
-      </div>
-      <button class="btn" id="chem-btn" onclick="increment('chem', event)">+ ADD QUESTION</button>
+    <div class="status-text" id="status-text">Off</div>
+
+    <div class="hint" id="hint-text">
+      Shake your phone or tap the icon to toggle the torch
     </div>
 
-    <!-- Math -->
-    <div class="card math">
-      <div class="card-head">
-        <span class="label">Mathematics</span>
-        <div class="icon">∑</div>
-      </div>
-      <div class="counter-wrap">
-        <div class="count" id="math-count">0</div>
-        <span class="unit">QS</span>
-      </div>
-      <div class="bar-wrap">
-        <div class="bar-meta">
-          <span>Progress</span>
-          <span id="math-pct">0%</span>
-        </div>
-        <div class="bar-bg"><div class="bar-fill" id="math-bar"></div></div>
-      </div>
-      <button class="btn" id="math-btn" onclick="increment('math', event)">+ ADD QUESTION</button>
-    </div>
-
+    <button id="permission-btn">Enable shake detection</button>
   </div>
 
-  <!-- Total strip -->
-  <div class="total-strip">
-    <div>
-      <p class="total-label">Total Questions Today</p>
-      <div class="total-num" id="total">0</div>
-    </div>
-    <div class="streak">Daily goal: <span id="goal-pct">0%</span> of 100 questions</div>
-    <button class="reset-btn" onclick="resetAll()">Reset Day</button>
-  </div>
-
-  <footer>Keep pushing — consistency beats intensity.</footer>
-
+  <div class="mode-badge" id="mode-badge">visual mode</div>
 </div>
 
-<!-- Floating label container -->
-<div class="float-label" id="float-label">+1</div>
-
 <script>
-  const state = { phy: 0, chem: 0, math: 0 };
-  const GOAL = 100;
-  const colors = { phy: '#00d4ff', chem: '#ff6b35', math: '#a8ff3e' };
+(function() {
+  const app        = document.getElementById('app');
+  const toggleBtn  = document.getElementById('toggle-btn');
+  const statusText = document.getElementById('status-text');
+  const hintText   = document.getElementById('hint-text');
+  const permBtn    = document.getElementById('permission-btn');
+  const modeBadge  = document.getElementById('mode-badge');
+  const overlay    = document.getElementById('flash-overlay');
 
-  function increment(sub, e) {
-    state[sub]++;
-    updateCard(sub);
-    updateTotal();
-    popAnimation(sub);
-    createRipple(e, sub);
-    showFloat(e, sub);
+  let torchOn      = false;
+  let torchStream  = null;
+  let torchTrack   = null;
+  let useRealTorch = false;
+  let motionReady  = false;
+
+  /* ---- Shake detection ---- */
+  let lastAcc = null;
+  let shakeLastTime = 0;
+  const SHAKE_THRESHOLD = 18;
+  const SHAKE_COOLDOWN  = 600;
+
+  function onMotion(e) {
+    const acc = e.accelerationIncludingGravity;
+    if (!acc) return;
+    const now = Date.now();
+    if (lastAcc) {
+      const dx = Math.abs(acc.x - lastAcc.x);
+      const dy = Math.abs(acc.y - lastAcc.y);
+      const dz = Math.abs(acc.z - lastAcc.z);
+      const delta = dx + dy + dz;
+      if (delta > SHAKE_THRESHOLD && (now - shakeLastTime) > SHAKE_COOLDOWN) {
+        shakeLastTime = now;
+        toggleTorch();
+      }
+    }
+    lastAcc = { x: acc.x, y: acc.y, z: acc.z };
   }
 
-  function updateCard(sub) {
-    const el = document.getElementById(sub + '-count');
-    el.textContent = state[sub];
-
-    const pct = Math.min((state[sub] / 30) * 100, 100); // bar fills at 30
-    document.getElementById(sub + '-bar').style.width = pct + '%';
-    document.getElementById(sub + '-pct').textContent = Math.round(pct) + '%';
+  function enableMotion() {
+    window.addEventListener('devicemotion', onMotion, { passive: true });
+    motionReady = true;
+    permBtn.style.display = 'none';
+    hintText.textContent  = 'Shake your phone or tap the icon to toggle the torch';
   }
 
-  function updateTotal() {
-    const tot = state.phy + state.chem + state.math;
-    document.getElementById('total').textContent = tot;
-    document.getElementById('goal-pct').textContent = Math.min(Math.round((tot / GOAL) * 100), 100) + '%';
+  /* iOS 13+ requires explicit permission */
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    permBtn.style.display = 'block';
+    hintText.textContent  = 'Tap the button below to enable shake detection';
+    permBtn.addEventListener('click', () => {
+      DeviceMotionEvent.requestPermission()
+        .then(state => { if (state === 'granted') enableMotion(); })
+        .catch(console.error);
+    });
+  } else if (typeof DeviceMotionEvent !== 'undefined') {
+    enableMotion();
   }
 
-  function popAnimation(sub) {
-    const el = document.getElementById(sub + '-count');
-    el.classList.remove('pop');
-    void el.offsetWidth; // reflow
-    el.classList.add('pop');
-    setTimeout(() => el.classList.remove('pop'), 200);
+  /* ---- Real camera torch ---- */
+  async function initTorch() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      const track = stream.getVideoTracks()[0];
+      const caps  = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.torch) {
+        torchStream  = stream;
+        torchTrack   = track;
+        useRealTorch = true;
+        modeBadge.textContent = 'real torch';
+      } else {
+        stream.getTracks().forEach(t => t.stop());
+      }
+    } catch (e) {
+      /* Camera unavailable — visual fallback */
+    }
   }
 
-  function createRipple(e, sub) {
-    const btn = document.getElementById(sub + '-btn');
-    const circle = document.createElement('span');
-    const rect = btn.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height);
-    const x = e.clientX - rect.left - size / 2;
-    const y = e.clientY - rect.top  - size / 2;
-    circle.className = 'ripple';
-    circle.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px`;
-    btn.appendChild(circle);
-    setTimeout(() => circle.remove(), 600);
+  /* ---- Toggle ---- */
+  function triggerRipple() {
+    const r = document.createElement('div');
+    r.className = 'ripple';
+    r.style.position = 'absolute';
+    toggleBtn.style.position = 'relative';
+    toggleBtn.appendChild(r);
+    r.addEventListener('animationend', () => r.remove());
   }
 
-  function showFloat(e, sub) {
-    const fl = document.getElementById('float-label');
-    fl.style.color = colors[sub];
-    fl.style.left = (e.clientX - 14) + 'px';
-    fl.style.top  = (e.clientY - 14) + 'px';
-    fl.classList.remove('active');
-    void fl.offsetWidth;
-    fl.classList.add('active');
+  async function setTorch(on) {
+    if (useRealTorch && torchTrack) {
+      try { await torchTrack.applyConstraints({ advanced: [{ torch: on }] }); }
+      catch(e) { useRealTorch = false; }
+    }
+    if (!useRealTorch) {
+      overlay.style.opacity = on ? '1' : '0';
+    }
+    app.classList.toggle('torch-on', on);
+    statusText.textContent = on ? 'On' : 'Off';
   }
 
-  function resetAll() {
-    if (!confirm('Reset today\'s counts?')) return;
-    state.phy = state.chem = state.math = 0;
-    ['phy','chem','math'].forEach(s => updateCard(s));
-    updateTotal();
+  async function toggleTorch() {
+    torchOn = !torchOn;
+    triggerRipple();
+    await setTorch(torchOn);
+    if ('vibrate' in navigator) navigator.vibrate(40);
   }
+
+  /* ---- UI events ---- */
+  toggleBtn.addEventListener('click', toggleTorch);
+  toggleBtn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTorch(); }
+  });
+
+  /* ---- Init ---- */
+  initTorch();
+})();
 </script>
 </body>
 </html>
